@@ -1,0 +1,46 @@
+/* boothmap 设计令牌：深靛蓝图纸（blueprint）+ 荧光黄标记 + 等宽展位号。
+   色板全部 oklch；禁用纯黑纯白；双字体 Barlow Condensed（图纸标签）+ Noto Sans SC（中文正文）。 */
+:root {
+  --paper: oklch(0.205 0.045 264);
+  --paper-2: oklch(0.245 0.05 264);
+  --paper-3: oklch(0.295 0.052 262);
+  --paper-raise: oklch(0.27 0.048 263);
+
+  --ink: oklch(0.945 0.012 96);
+  --ink-soft: oklch(0.8 0.02 100);
+  --ink-faint: oklch(0.64 0.028 250);
+  --rule: oklch(0.36 0.05 258);
+  --rule-strong: oklch(0.52 0.055 250);
+
+  --accent: oklch(0.87 0.19 106);
+  --accent-soft: oklch(0.74 0.15 106);
+  --accent-wash: oklch(0.32 0.07 106);
+  --accent-ink: oklch(0.22 0.05 264);
+
+  --ok: oklch(0.8 0.14 166);
+  --ok-wash: oklch(0.3 0.05 166);
+  --warn: oklch(0.82 0.15 72);
+  --warn-wash: oklch(0.33 0.06 72);
+  --danger: oklch(0.7 0.18 22);
+  --danger-wash: oklch(0.32 0.07 22);
+  --info: oklch(0.76 0.1 236);
+  --info-wash: oklch(0.3 0.05 236);
+
+  --font-display: 'Barlow Condensed', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-mono: 'SFMono-Regular', ui-monospace, 'Menlo', monospace;
+
+  --fs-xs: 0.72rem;
+  --fs-sm: 0.82rem;
+  --fs-md: 0.92rem;
+  --fs-lg: 1.16rem;
+  --fs-xl: clamp(1.5rem, 2.2vw, 2.1rem);
+  --fs-2xl: clamp(2.1rem, 3.8vw, 3.6rem);
+
+  --pad: clamp(14px, 1.5vw, 26px);
+  --rail: 232px;
+  --radius: 2px;
+  --grid-line: oklch(0.4 0.05 256 / 0.55);
+  --shadow: 0 1px 0 oklch(0.34 0.05 258), 0 22px 48px -38px oklch(0.08 0.04 264 / 0.9);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
