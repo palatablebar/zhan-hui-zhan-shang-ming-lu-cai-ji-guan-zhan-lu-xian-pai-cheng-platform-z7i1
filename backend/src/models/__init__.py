@@ -12,5 +12,23 @@ from src.models.exhibitor import Exhibitor  # noqa: E402
 from src.models.session import Session  # noqa: E402
 from src.models.route_run import RouteRun  # noqa: E402
 from src.models.visit import Visit  # noqa: E402
+from src.models.import_batch import (  # noqa: E402
+    DirectoryEntry,
+    DirectoryVersion,
+    ImportBatch,
+    StagingRow,
+)
 
-__all__ = ["Base", "User", "AuditLog", "Exhibitor", "Session", "RouteRun", "Visit"]
+__all__ = [
+    "Base",
+    "User",
+    "AuditLog",
+    "Exhibitor",
+    "Session",
+    "RouteRun",
+    "Visit",
+    "ImportBatch",
+    "StagingRow",
+    "DirectoryVersion",
+    "DirectoryEntry",
+]

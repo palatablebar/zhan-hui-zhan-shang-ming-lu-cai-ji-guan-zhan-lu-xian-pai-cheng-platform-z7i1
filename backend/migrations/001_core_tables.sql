@@ -101,3 +101,85 @@ CREATE TABLE audit_logs (
     seed_key       VARCHAR(120) UNIQUE,
     created_at     DATETIME NOT NULL
 );
+
+-- 批次补录：批次头（来源哈希、状态、核对数量）
+CREATE TABLE import_batches (
+    id                   INT AUTO_INCREMENT PRIMARY KEY,
+    batch_code           VARCHAR(64)  NOT NULL UNIQUE,
+    source_name          VARCHAR(255) NOT NULL DEFAULT '',
+    source_sha256        VARCHAR(64)  NOT NULL,
+    mode                 VARCHAR(16)  NOT NULL DEFAULT 'supplement',
+    status               VARCHAR(16)  NOT NULL DEFAULT 'registered',
+    total_rows           INT NOT NULL DEFAULT 0,
+    valid_count          INT NOT NULL DEFAULT 0,
+    quarantine_count     INT NOT NULL DEFAULT 0,
+    inserted_count       INT NOT NULL DEFAULT 0,
+    merged_count         INT NOT NULL DEFAULT 0,
+    skipped_count        INT NOT NULL DEFAULT 0,
+    reconciliation       JSON,
+    error_text           TEXT,
+    created_by           VARCHAR(160) NOT NULL DEFAULT 'system',
+    published_version_id INT,
+    created_at           DATETIME NOT NULL,
+    published_at         DATETIME,
+    INDEX ix_import_batches_status (status),
+    INDEX ix_import_batches_sha (source_sha256),
+    INDEX ix_import_batches_published_version (published_version_id),
+    INDEX ix_import_batches_created (created_at)
+);
+
+-- 批次补录：暂存行（valid 待入册 / quarantine 隔离并带原因码）
+CREATE TABLE import_staging_rows (
+    id                 INT AUTO_INCREMENT PRIMARY KEY,
+    batch_id           INT NOT NULL,
+    row_no             INT NOT NULL,
+    status             VARCHAR(16) NOT NULL DEFAULT 'valid',
+    raw_payload        JSON,
+    normalized         JSON,
+    reason_codes       JSON,
+    reason_detail      VARCHAR(500) NOT NULL DEFAULT '',
+    fingerprint        VARCHAR(64),
+    match_exhibitor_id INT,
+    created_at         DATETIME NOT NULL,
+    CONSTRAINT uq_staging_batch_row UNIQUE (batch_id, row_no),
+    INDEX ix_staging_batch (batch_id),
+    INDEX ix_staging_status (status),
+    INDEX ix_staging_batch_status (batch_id, status),
+    INDEX ix_staging_fingerprint (fingerprint),
+    CONSTRAINT fk_staging_batch FOREIGN KEY (batch_id)
+        REFERENCES import_batches(id) ON DELETE CASCADE
+);
+
+-- 名录版本：任一时刻仅一个 active；切换/回滚只翻状态指针
+CREATE TABLE directory_versions (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    version_no       INT NOT NULL UNIQUE,
+    label            VARCHAR(160) NOT NULL DEFAULT '',
+    status           VARCHAR(16) NOT NULL DEFAULT 'active',
+    source_batch_id  INT,
+    exhibitor_count  INT NOT NULL DEFAULT 0,
+    created_by       VARCHAR(160) NOT NULL DEFAULT 'system',
+    note             TEXT,
+    created_at       DATETIME NOT NULL,
+    published_at     DATETIME,
+    INDEX ix_versions_status (status),
+    INDEX ix_versions_batch (source_batch_id),
+    INDEX ix_versions_created (created_at),
+    CONSTRAINT fk_versions_batch FOREIGN KEY (source_batch_id)
+        REFERENCES import_batches(id) ON DELETE SET NULL
+);
+
+-- 名录版本成员快照：展商行永不因切换/回滚被删除
+CREATE TABLE directory_entries (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    version_id    INT NOT NULL,
+    exhibitor_id  INT NOT NULL,
+    created_at    DATETIME NOT NULL,
+    CONSTRAINT uq_directory_entry UNIQUE (version_id, exhibitor_id),
+    INDEX ix_directory_entry_version (version_id),
+    INDEX ix_directory_entry_exhibitor (exhibitor_id),
+    CONSTRAINT fk_directory_version FOREIGN KEY (version_id)
+        REFERENCES directory_versions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_directory_exhibitor FOREIGN KEY (exhibitor_id)
+        REFERENCES exhibitors(id) ON DELETE CASCADE
+);

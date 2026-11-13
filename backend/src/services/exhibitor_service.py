@@ -98,8 +98,23 @@ def _apply_appointment(exhibitor: Exhibitor, appointment_at: datetime | None, wi
     exhibitor.appointment_end_min = start_min + window_min
 
 
-def _priority_counts(db: Session) -> dict:
-    rows = db.execute(select(Exhibitor.priority, func.count()).group_by(Exhibitor.priority)).all()
+def _active_scope_filter(db: Session):
+    """构造「当前名录版本成员」过滤条件；无版本（全新库）时不裁剪，沿用全表口径。"""
+    from src.models.import_batch import DirectoryEntry, DirectoryVersion
+    from src.models.import_batch import VERSION_ACTIVE
+
+    version = db.scalar(select(DirectoryVersion).where(DirectoryVersion.status == VERSION_ACTIVE))
+    if version is None:
+        return None
+    member_ids = select(DirectoryEntry.exhibitor_id).where(DirectoryEntry.version_id == version.id)
+    return Exhibitor.id.in_(member_ids)
+
+
+def _priority_counts(db: Session, scope=None) -> dict:
+    stmt = select(Exhibitor.priority, func.count())
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = db.execute(stmt.group_by(Exhibitor.priority)).all()
     counts = {"P0": 0, "P1": 0, "P2": 0}
     for key, count in rows:
         counts[key] = count
@@ -122,6 +137,9 @@ def list_exhibitors(
     stmt = select(Exhibitor)
     count_stmt = select(func.count()).select_from(Exhibitor)
     filters = []
+    scope = _active_scope_filter(db)
+    if scope is not None:
+        filters.append(scope)
     if q:
         like = f"%{q.strip()}%"
         filters.append(Exhibitor.name.ilike(like) | Exhibitor.booth_no.ilike(like))
@@ -151,7 +169,7 @@ def list_exhibitors(
         "total": total,
         "limit": limit,
         "offset": offset,
-        "counts": _priority_counts(db),
+        "counts": _priority_counts(db, scope),
     }
 
 

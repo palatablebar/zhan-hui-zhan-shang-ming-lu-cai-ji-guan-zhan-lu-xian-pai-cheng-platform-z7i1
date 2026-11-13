@@ -3,6 +3,7 @@ from fastapi import APIRouter
 
 from src.routes.audit import router as audit_router
 from src.routes.auth import router as auth_router
+from src.routes.batch_imports import router as batch_imports_router
 from src.routes.exhibitors import router as exhibitors_router
 from src.routes.exports import router as exports_router
 from src.routes.health import router as health_router
@@ -21,3 +22,4 @@ api_router.include_router(route_runs_router)
 api_router.include_router(visits_router)
 api_router.include_router(exports_router)
 api_router.include_router(audit_router)
+api_router.include_router(batch_imports_router)

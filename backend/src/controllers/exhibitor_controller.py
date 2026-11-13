@@ -51,7 +51,14 @@ def update_exhibitor(db: Session, exhibitor_id: int, payload: dict, principal: d
 
 
 def _rows(db: Session) -> list[Exhibitor]:
-    return list(db.query(Exhibitor).order_by(Exhibitor.hall, Exhibitor.row_no, Exhibitor.col_no).all())
+    """平面图读取口径：仅当前 active 名录版本成员；无版本时回退全表（全新库）。"""
+    from src.services.batch_import import importer
+
+    _, member_ids = importer.active_version_scoped(db)
+    stmt = db.query(Exhibitor).order_by(Exhibitor.hall, Exhibitor.row_no, Exhibitor.col_no)
+    if member_ids is not None:
+        stmt = stmt.filter(Exhibitor.id.in_(member_ids))
+    return list(stmt.all())
 
 
 def distance_groups(db: Session) -> dict:

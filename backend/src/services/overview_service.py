@@ -22,6 +22,18 @@ from src.models.visit import Visit
 from src.services import route_service, session_service
 
 
+def _active_member_filter(db: Session):
+    """当前名录版本成员过滤；无版本时返回 None（全新库不裁剪）。"""
+    from src.models.import_batch import DirectoryEntry, DirectoryVersion
+    from src.models.import_batch import VERSION_ACTIVE
+
+    version = db.scalar(select(DirectoryVersion).where(DirectoryVersion.status == VERSION_ACTIVE))
+    if version is None:
+        return None
+    member_ids = select(DirectoryEntry.exhibitor_id).where(DirectoryEntry.version_id == version.id)
+    return Exhibitor.id.in_(member_ids)
+
+
 def worker_alive() -> bool:
     try:
         import time
@@ -35,24 +47,33 @@ def worker_alive() -> bool:
         return False
 
 
-def _priority_counts(db: Session) -> list[dict]:
-    rows = dict(db.execute(select(Exhibitor.priority, func.count()).group_by(Exhibitor.priority)).all())
+def _priority_counts(db: Session, scope=None) -> list[dict]:
+    stmt = select(Exhibitor.priority, func.count())
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = dict(db.execute(stmt.group_by(Exhibitor.priority)).all())
     return [
         {"key": key, "label": PRIORITY_LABELS.get(key, key), "count": int(rows.get(key, 0))}
         for key in PRIORITY_ORDER
     ]
 
 
-def _hall_counts(db: Session) -> list[dict]:
-    rows = db.execute(select(Exhibitor.hall, func.count()).group_by(Exhibitor.hall)).all()
+def _hall_counts(db: Session, scope=None) -> list[dict]:
+    stmt = select(Exhibitor.hall, func.count())
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = db.execute(stmt.group_by(Exhibitor.hall)).all()
     return [
         {"key": hall, "label": HALL_LABELS.get(hall, hall), "count": count}
         for hall, count in sorted(rows)
     ]
 
 
-def _category_counts(db: Session) -> list[dict]:
-    rows = db.execute(select(Exhibitor.category, func.count()).group_by(Exhibitor.category)).all()
+def _category_counts(db: Session, scope=None) -> list[dict]:
+    stmt = select(Exhibitor.category, func.count())
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = db.execute(stmt.group_by(Exhibitor.category)).all()
     return sorted(
         [{"key": key, "label": CATEGORY_LABELS.get(key, key), "count": count} for key, count in rows],
         key=lambda item: -item["count"],
@@ -109,21 +130,27 @@ def _timeline(db: Session, run: RouteRun | None) -> list[dict]:
 
 
 def overview(db: Session) -> dict:
-    exhibitors_total = db.scalar(select(func.count()).select_from(Exhibitor)) or 0
-    sessions_total = db.scalar(select(func.count()).select_from(Session)) or 0
-    runs_total = db.scalar(select(func.count()).select_from(RouteRun)) or 0
-    visits_total = db.scalar(select(func.count()).select_from(Visit)) or 0
+    scope = _active_member_filter(db)
+
+    def _count(model, *clauses):
+        stmt = select(func.count()).select_from(model)
+        if model is Exhibitor and scope is not None:
+            stmt = stmt.where(scope)
+        for clause in clauses:
+            stmt = stmt.where(clause)
+        return db.scalar(stmt) or 0
+
+    exhibitors_total = _count(Exhibitor)
+    sessions_total = _count(Session)
+    runs_total = _count(RouteRun)
+    visits_total = _count(Visit)
     latest_run = db.scalar(select(RouteRun).order_by(RouteRun.id.desc()).limit(1))
     conflicts = 0
     deferred = 0
     if latest_run is not None:
-        conflicts = db.scalar(
-            select(func.count()).select_from(Visit).where(Visit.run_id == latest_run.id, Visit.conflict.is_(True))
-        ) or 0
-        deferred = db.scalar(
-            select(func.count()).select_from(Visit).where(Visit.run_id == latest_run.id, Visit.status == "deferred")
-        ) or 0
-    appointment_total = db.scalar(select(func.count()).select_from(Exhibitor).where(Exhibitor.appointment_day.is_not(None))) or 0
+        conflicts = _count(Visit, Visit.run_id == latest_run.id, Visit.conflict.is_(True))
+        deferred = _count(Visit, Visit.run_id == latest_run.id, Visit.status == "deferred")
+    appointment_total = _count(Exhibitor, Exhibitor.appointment_day.is_not(None))
     return {
         "exhibitors_total": exhibitors_total,
         "sessions_total": sessions_total,
@@ -133,9 +160,9 @@ def overview(db: Session) -> dict:
         "deferred": deferred,
         "appointment_total": appointment_total,
         "worker_alive": worker_alive(),
-        "priority": _priority_counts(db),
-        "halls": _hall_counts(db),
-        "categories": _category_counts(db),
+        "priority": _priority_counts(db, scope),
+        "halls": _hall_counts(db, scope),
+        "categories": _category_counts(db, scope),
         "latest_run": (
             {
                 "id": latest_run.id,

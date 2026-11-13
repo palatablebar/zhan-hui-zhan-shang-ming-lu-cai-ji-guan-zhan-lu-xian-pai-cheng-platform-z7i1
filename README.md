@@ -94,9 +94,10 @@ cd frontend/site && python -m http.server 5173
 ```text
 backend/
   src/{config,constants,controllers,middlewares,models,routes,schemas,services,utils}
-  scripts/{seed_demo.py,demo_config.py,worker_healthcheck.sh}
+  src/services/batch_import/   # 批次补录：readers / normalizer / importer（暂存隔离 + 版本切换）
+  scripts/{seed_demo.py,demo_config.py,batch_import_cli.py,worker_healthcheck.sh}
   migrations/            # 人类可读 DDL 参考
-  tests/                 # 算法/工具单测（pytest）
+  tests/                 # 算法/工具/批次补录单测（pytest）
 frontend/
   site/{index.html,css/{tokens,app}.css,js/{api,store,ui,config,app}.js,js/pages/*.js}
   nginx.conf
@@ -148,7 +149,56 @@ docker-compose.yml .env .env.example
 > seed 的 `SEED_SUMMARY` 沿用批次固定键名：`sources` = 展商名录条目数，`runs` = 路线排程次数，
 > `findings` = 到访条目数（含冲突改期行），`pending` = 仍为 `planned` 的到访数。
 
-## 12. Docker 说明
+## 12. 批次补录与名录版本（每日官网补发）
+
+官网每天补发、现场同事也会改优先级/预约，因此名录变更走**先隔离、后整批切换**的批次管道，
+而不是逐条直接写正式名录。实现见 `backend/src/services/batch_import/`。
+
+### 12.1 两阶段流程
+
+1. **登记（register，只写暂存表，不碰正式名录）**：来源 CSV/JSON 逐行清洗
+   （`normalizer.py`），把 `A1馆23号`、`A1－023`、`A1-02-3` 等异写规范化为 `A1-023`；
+   - 好行 → `import_staging_rows.status=valid`，并计算内容指纹；
+   - 坏行 → `status=quarantine`，逐行写**原因码**（展位格式、馆号不符、优先级非法、
+     同批同馆同展位重复、预约超窗等，见 `normalizer.REASON_LABELS`），坏行永不入册；
+   - 暂存阶段不写 `exhibitors`，所以脏数据无法污染平面图/排程。
+2. **发布（publish，整批校验通过后单事务一次性切换）**：
+   - 先跑核对（`build_reconciliation`）：恒等式 `来源 = 好行 + 隔离`、好行无重复展位；
+   - 单事务内：好行入册（仅新增全新展位；**已存在展位零写入，人工修改原样保留**）→
+     生成新 `directory_versions` 版本与成员快照 `directory_entries` → 翻转 `active` 指针；
+   - 任一步异常随 SAVEPOINT/事务回滚，旧版本保持 active，展商行零删除。
+
+### 12.2 幂等与人工修改保护
+
+- 批次以 `batch_code` 为幂等键、以来源 `sha256` 防重放：重复登记返回同一批次、重复发布是 no-op，
+  **不新增、不覆盖**；核对里的 `manual_edited_existing` 显式标出与来源不一致的现册行。
+- 名录对平面图（distance-groups/matrix）、两日排程（候选加载）、总览统计的可见性，
+  统一以当前 active 版本成员为准；无版本（全新库）时回退全表，不破坏 seed 演示。
+
+### 12.3 回滚与数量核对
+
+- `rollback` 只翻转版本指针并恢复成员可见性，历史版本与展商行全部保留（不丢数据）；
+- 批次与版本接口返回并审计四类数量：**来源 source_rows / 入册 valid+inserted /
+  隔离 quarantine / 合并 merged（含 skipped 人工保留）**。
+
+### 12.4 接口与 CLI（均仅 admin；analyst/viewer 返回真实 403）
+
+| 动作 | 接口 |
+|---|---|
+| 上传/JSON 登记 | `POST /api/imports/batches/upload`、`POST /api/imports/batches` |
+| 批次与隔离行 | `GET /api/imports/batches`、`GET /api/imports/batches/{id}`、`/staging` |
+| 发布切换 | `POST /api/imports/batches/{id}/publish` |
+| 版本与回滚 | `GET /api/imports/directory/versions`、`POST /api/imports/directory/versions/{id}/rollback` |
+
+```bash
+# 离线/运维入口（来源文件按不可信数据处理，路径仅作参数传入）
+python -m scripts.batch_import_cli run /path/to/batch.csv --code B20261113-01
+python -m scripts.batch_import_cli staging B20261113-01 --status quarantine
+python -m scripts.batch_import_cli versions
+python -m scripts.batch_import_cli rollback <version_id>
+```
+
+## 13. Docker 说明
 
 - 5 个服务：`frontend`(Nginx 静态站) / `backend`(uvicorn) / `worker`(Celery) / `db`(MySQL 8.0) / `redis`，全部带 healthcheck。
 - 命名卷：`db_data`、`redis_data`。

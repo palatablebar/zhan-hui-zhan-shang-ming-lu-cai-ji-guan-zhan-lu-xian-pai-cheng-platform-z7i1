@@ -37,7 +37,14 @@ def next_run_no(db: Session) -> str:
 
 
 def load_candidates(db: Session, priorities: list[str]) -> tuple[list[route_service.Candidate], int]:
-    rows = db.scalars(select(Exhibitor).order_by(Exhibitor.id)).all()
+    # 两日排程只面向当前 active 名录版本；无版本（全新库）时回退全表。
+    from src.services.batch_import import importer
+
+    _, member_ids = importer.active_version_scoped(db)
+    stmt = select(Exhibitor).order_by(Exhibitor.id)
+    if member_ids is not None:
+        stmt = stmt.where(Exhibitor.id.in_(member_ids))
+    rows = db.scalars(stmt).all()
     candidates: list[route_service.Candidate] = []
     invalid = 0
     for row in rows:
