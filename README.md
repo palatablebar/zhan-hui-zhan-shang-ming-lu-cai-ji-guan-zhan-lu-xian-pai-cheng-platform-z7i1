@@ -181,7 +181,10 @@ docker-compose.yml .env .env.example
 - 批次与版本接口返回并审计四类数量：**来源 source_rows / 入册 valid+inserted /
   隔离 quarantine / 合并 merged（含 skipped 人工保留）**。
 
-### 12.4 接口与 CLI（均仅 admin；analyst/viewer 返回真实 403）
+### 12.4 接口、界面与 CLI（均仅 admin；analyst/viewer 返回真实 403）
+
+管理员在前端「批次补录」导航（`#/imports`，仅 admin 可见）即可完成上传登记、查看隔离原因、
+发布切换与版本回滚；analyst/viewer 看不到入口且直接访问该路由显示无权限。
 
 | 动作 | 接口 |
 |---|---|

@@ -69,9 +69,35 @@ async function download(path, filename) {
   URL.revokeObjectURL(url);
 }
 
+async function upload(path, formData) {
+  const token = session.token();
+  let response;
+  try {
+    response = await fetch(path, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData, // 不手动设置 Content-Type，浏览器自动带 multipart boundary
+    });
+  } catch (err) {
+    throw new ApiError('网络不可达，请确认服务已启动', 'NETWORK', 0, null);
+  }
+  if (response.status === 401) {
+    session.clear();
+    if (location.hash !== '#/login') location.hash = '#/login';
+    throw new ApiError('登录已过期，请重新登录', 'AUTH_MISSING', 401, null);
+  }
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.message || `请求失败（${response.status}）`;
+    throw new ApiError(message, payload?.code || 'INTERNAL', response.status, payload?.detail);
+  }
+  return payload;
+}
+
 export const api = {
   get: (path, query) => request(path, { query }),
   post: (path, body) => request(path, { method: 'POST', body }),
   patch: (path, body) => request(path, { method: 'PATCH', body }),
+  upload,
   download,
 };

@@ -35,10 +35,11 @@ export const BRAND = {
 export const NAV = [
   { to: '#/overview', no: '01', label: '总览', permission: 'overview:read' },
   { to: '#/exhibitors', no: '02', label: '展商名录', permission: 'exhibitor:read' },
-  { to: '#/floorplan', no: '03', label: '展馆平面图', permission: 'exhibitor:read' },
-  { to: '#/routing', no: '04', label: '路线规划', permission: 'route:read' },
-  { to: '#/sessions', no: '05', label: '论坛日程', permission: 'session:read' },
-  { to: '#/audit', no: '06', label: '审计日志', permission: 'audit:read' },
+  { to: '#/imports', no: '03', label: '批次补录', permission: 'exhibitor:write' },
+  { to: '#/floorplan', no: '04', label: '展馆平面图', permission: 'exhibitor:read' },
+  { to: '#/routing', no: '05', label: '路线规划', permission: 'route:read' },
+  { to: '#/sessions', no: '06', label: '论坛日程', permission: 'session:read' },
+  { to: '#/audit', no: '07', label: '审计日志', permission: 'audit:read' },
 ];
 
 export const ROLE_LABELS = {
@@ -107,6 +108,29 @@ export const ENUMS = {
     overtime: '超出当日',
   },
   trigger: { manual: '手动', schedule: '定时', seed: '初始化' },
+  batchStatus: {
+    registered: '待发布',
+    published: '已发布',
+    failed: '发布失败',
+  },
+  importMode: { supplement: '补录（保留旧名录）', snapshot: '快照（以本批为准）' },
+  versionStatus: {
+    active: '当前版本',
+    retired: '已退休',
+    rolled_back: '已回滚',
+  },
+  quarantineReason: {
+    booth_format_invalid: '展位号格式无法识别',
+    hall_unknown: '馆号不在 A1…D2 范围',
+    hall_booth_mismatch: '馆号字段与展位号所属馆不一致',
+    name_missing: '展商名称缺失',
+    priority_invalid: '优先级非法（仅允许 P0/P1/P2）',
+    category_invalid: '品类非法',
+    industry_invalid: '目标行业非法',
+    duplicate_booth_in_batch: '同批次内同馆同展位重复',
+    appointment_invalid: '预约时间无法解析或不在展期 09:00-18:00',
+    phone_invalid: '联系电话含非法字符',
+  },
 };
 
 export function can(role, permission) {

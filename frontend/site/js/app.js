@@ -5,6 +5,7 @@ import { errorMessage, esc, toast } from './ui.js';
 import loginPage from './pages/login.js';
 import overviewPage from './pages/overview.js';
 import exhibitorsPage from './pages/exhibitors.js';
+import importsPage from './pages/imports.js';
 import floorplanPage from './pages/floorplan.js';
 import routingPage from './pages/routing.js';
 import sessionsPage from './pages/sessions.js';
@@ -13,6 +14,7 @@ import auditPage from './pages/audit.js';
 const routes = [
   { path: '#/overview', page: overviewPage, permission: 'overview:read' },
   { path: '#/exhibitors', page: exhibitorsPage, permission: 'exhibitor:read' },
+  { path: '#/imports', page: importsPage, permission: 'exhibitor:write' },
   { path: '#/floorplan', page: floorplanPage, permission: 'exhibitor:read' },
   { path: '#/routing', page: routingPage, permission: 'route:read' },
   { path: '#/sessions', page: sessionsPage, permission: 'session:read' },
